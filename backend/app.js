@@ -10,12 +10,9 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
 // Routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/quizzes', require('./routes/quizzes'));
-app.use('/api/questions', require('./routes/questions'));
-app.use('/api/options', require('./routes/options'));
-app.use('/api/submissions', require('./routes/submissions'));
-app.use('/api/attempts', require('./routes/attempts'));
+app.use('/api/auth', require('./routes/auth')); // optional if you have auth
+app.use('/api/quizzes', require('./routes/quizzes')); // fetch quizzes with questions/options
+app.use('/api/submissions', require('./routes/submissions')); // submit quiz, record attempts
 
 // Health check
 app.get('/api/health', (_, res) => {
@@ -24,6 +21,7 @@ app.get('/api/health', (_, res) => {
 
 // Global error handler
 app.use((err, req, res, next) => {
+  console.error(err);
   res.status(500).json({ error: 'Server error', message: err.message });
 });
 

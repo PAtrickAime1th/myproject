@@ -2,29 +2,38 @@ const express = require('express');
 const router = express.Router();
 const { executeQuery } = require('../db/connection');
 
-// Submit a quiz
-router.post('/:quizId', async (req, res) => {
-  const { quizId } = req.params;
-  const { user_id, score } = req.body;
+// Submit quiz answers
+router.post('/', async (req, res) => {
+  const { quiz_id, answers, user_id } = req.body; // user_id must come from auth
 
   try {
+    // 1️⃣ Calculate score
+    let score = 0;
+
+    for (const [questionId, selectedOptionId] of Object.entries(answers)) {
+      const optionRows = await executeQuery(
+        'SELECT is_correct FROM options WHERE id = ? AND question_id = ?',
+        [selectedOptionId, questionId]
+      );
+      if (optionRows.length && optionRows[0].is_correct) score += 1;
+    }
+
+    // 2️⃣ Save submission
     const result = await executeQuery(
-      'INSERT INTO submissions (user_id, quiz_id, score) VALUES (?, ?, ?)',
-      [user_id, quizId, score]
+      'INSERT INTO submissions (user_id, quiz_id, answers, score) VALUES (?, ?, ?, ?)',
+      [user_id, quiz_id, JSON.stringify(answers), score]
     );
-    res.status(201).json({ submission_id: result.insertId, user_id, quiz_id: quizId, score });
+
+    // 3️⃣ Save attempt
+    await executeQuery(
+      'INSERT INTO attempts (user_id, quiz_id, score) VALUES (?, ?, ?)',
+      [user_id, quiz_id, score]
+    );
+
+    res.json({ submissionId: result.insertId, score });
+
   } catch (err) {
     res.status(500).json({ error: 'Error submitting quiz', message: err.message });
-  }
-});
-
-// Get submissions for a user
-router.get('/user/:userId', async (req, res) => {
-  try {
-    const rows = await executeQuery('SELECT * FROM submissions WHERE user_id = ?', [req.params.userId]);
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: 'Error fetching submissions', message: err.message });
   }
 });
 

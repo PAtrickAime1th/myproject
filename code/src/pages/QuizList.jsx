@@ -7,7 +7,7 @@ export default function QuizList() {
 
   useEffect(() => {
     const fetchQuizzes = async () => {
-      const data = await fetchAPI('/quizzes');
+      const data = await fetchAPI('/api/quizzes'); // <-- add /api prefix
       setQuizzes(data);
     };
     fetchQuizzes();

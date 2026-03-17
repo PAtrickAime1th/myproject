@@ -2,20 +2,6 @@ const express = require('express');
 const router = express.Router();
 const { executeQuery } = require('../db/connection');
 
-// Create a new quiz
-router.post('/', async (req, res) => {
-  const { title, description } = req.body;
-  try {
-    const result = await executeQuery(
-      'INSERT INTO quizzes (title, description) VALUES (?, ?)',
-      [title, description]
-    );
-    res.status(201).json({ id: result.insertId, title, description });
-  } catch (err) {
-    res.status(500).json({ error: 'Error creating quiz', message: err.message });
-  }
-});
-
 // Get all quizzes
 router.get('/', async (req, res) => {
   try {
@@ -26,7 +12,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get quiz by ID with questions and options
+// Get single quiz by ID with all questions and options
 router.get('/:id', async (req, res) => {
   const quizId = req.params.id;
 
@@ -36,28 +22,47 @@ router.get('/:id', async (req, res) => {
     if (quizRows.length === 0) return res.status(404).json({ error: 'Quiz not found' });
     const quiz = quizRows[0];
 
-    // 2️⃣ Fetch questions for this quiz
-    const questions = await executeQuery(
-      'SELECT id, question_text FROM questions WHERE quiz_id = ?',
+    // 2️⃣ Fetch all questions with their options in one query
+    const questionRows = await executeQuery(
+      `SELECT 
+         q.id AS question_id, 
+         q.text AS question_text,
+         o.id AS option_id, 
+         o.option_text, 
+         o.is_correct
+       FROM questions q
+       LEFT JOIN options o ON q.id = o.question_id
+       WHERE q.quiz_id = ?
+       ORDER BY q.id, o.id`,
       [quizId]
     );
 
-    // 3️⃣ Fetch options for each question
-    for (let q of questions) {
-      const options = await executeQuery(
-        'SELECT id, option_text FROM options WHERE question_id = ?',
-        [q.id]
-      );
-      q.options = options;
-    }
+    // 3️⃣ Transform flat query into nested structure
+    const questionMap = {};
+    questionRows.forEach(row => {
+      if (!questionMap[row.question_id]) {
+        questionMap[row.question_id] = {
+          id: row.question_id,
+          question_text: row.question_text,
+          options: []
+        };
+      }
+      if (row.option_id) {
+        questionMap[row.question_id].options.push({
+          id: row.option_id,
+          option_text: row.option_text,
+          is_correct: row.is_correct
+        });
+      }
+    });
 
-    // 4️⃣ Return combined quiz object
     res.json({
       id: quiz.id,
       title: quiz.title,
       description: quiz.description,
-      questions
+      questions: Object.values(questionMap)
     });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error fetching quiz', message: err.message });

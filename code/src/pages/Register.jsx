@@ -10,17 +10,34 @@ export default function Register() {
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    setLoading(true); // start animation
+    setLoading(true);
+
     try {
+      // Call the backend register endpoint
       const res = await fetchAPI('/auth/register', 'POST', { username, password });
+
       if (res.id) {
+        // ✅ Automatically log in the user after registration
+        const loginRes = await fetchAPI('/auth/login', 'POST', { username, password });
+
+        if (loginRes.token && loginRes.user) {
+          localStorage.setItem('token', loginRes.token);
+          localStorage.setItem('user', JSON.stringify(loginRes.user));
+          navigate('/'); // Go to quiz list
+          return;
+        }
+
+        // If auto-login fails, show message and redirect to login
         alert('Registration successful! You can now login.');
         navigate('/login');
       } else {
         alert(res.error || 'Registration failed');
       }
+    } catch (err) {
+      console.error('Registration error:', err);
+      alert('Registration failed');
     } finally {
-      setLoading(false); // stop animation
+      setLoading(false);
     }
   };
 
@@ -50,11 +67,7 @@ export default function Register() {
             />
           </div>
           <div className="d-grid mb-3">
-            <button
-              type="submit"
-              className="btn btn-dark"
-              disabled={loading} // disable while registering
-            >
+            <button type="submit" className="btn btn-dark" disabled={loading}>
               {loading ? (
                 <>
                   <span className="spinner-border spinner-border-sm me-2"></span>
